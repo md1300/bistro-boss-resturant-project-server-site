@@ -34,38 +34,9 @@ async function run() {
     const reviewCollection=client.db("bistrodb").collection("reviews")
     const cartsCollection=client.db("bistrodb").collection("carts")
 
-  app.get('/menu',async(req,res)=>{
-    const result=await menuCollection.find().toArray()
-    res.send(result)
-  })
-
-  app.get('/reviews',async(req,res)=>{
-    const result=await reviewCollection.find().toArray()
-    res.send(result)
-  })
-  // ---------------------carts collection ----------
-  app.get('/carts',async(req,res)=>{
-    const email=req.query.email;
-    const query={email:email}
-    const result=await cartsCollection.find(query).toArray()
-    res.send(result)
-  })
-
- app.post('/carts',async(req,res)=>{
-   const cartsItem=req.body;
-   const result=await cartsCollection.insertOne(cartsItem)
-   res.send(result)
- })
-
- app.delete('/carts/:id',async(req,res)=>{
-  const id=req.params.id;
-  const query={_id:new ObjectId(id)}
-  const result=await cartsCollection.deleteOne(query)
-  res.send(result)
- })
-//  ----------middleware ---------------
+    //  ----------middleware ---------------
 const verifyToken=(req,res,next)=>{
-  console.log('inside verify token',req.headers.authorization)
+  // console.log('inside verify token',req.headers.authorization)
   if(!req.headers.authorization){
     return res.status(401).send({message:'unauthorized access'})
   }
@@ -150,6 +121,76 @@ app.get('/users/admin/:email',verifyToken,async(req,res)=>{
   res.send(result)
  })
 
+
+// ---------------- menu related Api -------------
+  app.get('/menu',async(req,res)=>{
+    const result=await menuCollection.find().toArray()
+    res.send(result)
+  })
+
+  app.delete('/menu/:id',verifyToken,adminVerify, async(req,res)=>{
+    const id=req.params.id
+    const query={_id: new ObjectId(id)}
+    const result=await menuCollection.deleteOne(query)
+    res.send(result)
+  })
+
+app.get('/menu/:id',async(req,res)=>{
+  const id=req.params.id;
+  // console.log(id)
+  // const query={_id: new ObjectId(id)}
+  const query={_id:id}
+  const result=await menuCollection.findOne(query)
+  res.send(result)
+})
+
+app.patch('/menu/:id',verifyToken,adminVerify, async(req,res)=>{
+  const item=req.body;
+  const id=req.params.id;
+  const filter={_id:id}
+  const updateDoc={
+   $set:{
+    name:item.name,
+    recipe:item.recipe,
+    price:item.price,
+    category:item.category,
+    image:item.image,
+   }
+  }
+  const result=await menuCollection.updateOne(filter,updateDoc)
+  res.send(result)
+})
+
+  app.post('/menu',verifyToken,adminVerify, async(req,res)=>{
+    const item=req.body;
+    const result=await menuCollection.insertOne(item)
+    res.send(result)
+  })
+
+  app.get('/reviews',async(req,res)=>{
+    const result=await reviewCollection.find().toArray()
+    res.send(result)
+  })
+  // ---------------------carts collection ----------
+  app.get('/carts',async(req,res)=>{
+    const email=req.query.email;
+    const query={email:email}
+    const result=await cartsCollection.find(query).toArray()
+    res.send(result)
+  })
+
+ app.post('/carts',async(req,res)=>{
+   const cartsItem=req.body;
+   const result=await cartsCollection.insertOne(cartsItem)
+   res.send(result)
+ })
+
+ app.delete('/carts/:id',async(req,res)=>{
+  const id=req.params.id;
+  const query={_id:new ObjectId(id)}
+  const result=await cartsCollection.deleteOne(query)
+  res.send(result)
+ })
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
