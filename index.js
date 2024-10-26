@@ -3,6 +3,7 @@ const app=express()
 const cors=require('cors')
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port=process.env.PORT || 5000
 
 app.use(express.json())
@@ -33,6 +34,7 @@ async function run() {
     const userCollection=client.db("bistrodb").collection("users")
     const reviewCollection=client.db("bistrodb").collection("reviews")
     const cartsCollection=client.db("bistrodb").collection("carts")
+    const paymentsCollection=client.db("bistrodb").collection("payments")
 
     //  ----------middleware ---------------
 const verifyToken=(req,res,next)=>{
@@ -191,6 +193,44 @@ app.patch('/menu/:id',verifyToken,adminVerify, async(req,res)=>{
   const result=await cartsCollection.deleteOne(query)
   res.send(result)
  })
+
+//  -----------payment intend ------------
+app.post('/create-payment-intent',async(req,res)=>{
+  const {price}=req.body;
+  const amount=parseInt(price*100)
+  const paymentIntend=await stripe.paymentIntents.create({
+    amount:amount,
+    currency:'usd',
+    payment_method_types:['card'],
+  })
+  res.send({
+    clientSecret:paymentIntend.client_secret,
+  })
+})
+
+app.get('/payment/:email',verifyToken, async(req,res)=>{
+  const query={email:req.params.email}
+  if(req.params.email!==req.decoded.email){
+    return res.status(403).send({message:'forbidden access'})
+  }
+  const result= await paymentsCollection.find(query).toArray()
+    res.send(result)
+  
+})
+
+app.post('/payment',async(req,res)=>{
+  const payments=req.body;
+  const paymentResult=await paymentsCollection.insertOne(payments)
+// carefully delete each item from the cart 
+ console.log(payments)
+const query={_id:{
+  $in:payments.cartIds.map(id=> new ObjectId(id))
+}}
+const deleteResult=await cartsCollection.deleteMany(query)
+res.send({paymentResult,deleteResult})
+
+
+})
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
