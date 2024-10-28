@@ -7,7 +7,9 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port=process.env.PORT || 5000
 
 app.use(express.json())
-app.use(cors())
+app.use(cors({
+  origin:['bistro-boss-1a12e.web.app','http://localhost:5173','http://localhost:5174']
+}))
 
 app.get('/',async(req,res)=>{
     res.send('bistro boss server is running')
