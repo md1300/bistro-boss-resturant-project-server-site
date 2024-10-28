@@ -42,10 +42,12 @@ const verifyToken=(req,res,next)=>{
   if(!req.headers.authorization){
     return res.status(401).send({message:'unauthorized access'})
   }
-  const token=req.headers.authorization.split(' ')[1]
+  const token=req.headers.authorization.split(" ")[1]
+  // console.log({token})
   jwt.verify(token,process.env.ACCESS_TOKEN_SECURES,(err,decoded)=>{
     if(err){
-     return res.status(401).send({message:'unauthorized  access'})
+      // console.log(err)
+     return res.status(401).send({message:'unauthorized  access after verify token'})
     }
     req.decoded=decoded;
      next()
@@ -55,7 +57,7 @@ const verifyToken=(req,res,next)=>{
 // ------------ jwt related token ---------------
 app.post('/jwt',(req,res)=>{
   const user=req.body;
-  const token=jwt.sign(user, process.env.ACCESS_TOKEN_SECURES, {expiresIn:'365d'})
+  const token=jwt.sign(user, process.env.ACCESS_TOKEN_SECURES, {expiresIn:'7d'})
   res.send({token})
 })
 // -----------admin related middleware -----------
@@ -97,7 +99,7 @@ app.get('/users',verifyToken,adminVerify,async(req,res)=>{
  });
 
 //  get admin user ------------
-app.get('/users/admin/:email',verifyToken,async(req,res)=>{
+app.get('/users/admin/:email',verifyToken, async(req,res)=>{
   const email=req.params.email;
   if(email !==req.decoded.email){
     return res.status(403).send({message:'unauthorized access'})
@@ -229,7 +231,66 @@ const query={_id:{
 const deleteResult=await cartsCollection.deleteMany(query)
 res.send({paymentResult,deleteResult})
 
+})
 
+app.get('/admin-stats',verifyToken,adminVerify, async(req,res)=>{
+  const users = await userCollection.estimatedDocumentCount();
+  const menuItems = await menuCollection.estimatedDocumentCount() ;
+  const orders = await paymentsCollection.estimatedDocumentCount();
+ 
+  //  this is not best way -----------
+
+  // const payments=await paymentsCollection.find().toArray()
+  // const revenue=payments.reduce((total,payment)=>total+payment.price,0)
+
+  const result=await paymentsCollection.aggregate([
+    {
+      $group:{_id:null,totalRevenue:{$sum:'$price'}}
+    }
+  ]).toArray()
+const revenue=result.length>0 ? result[0].totalRevenue : 0;
+  res.send({
+    users,
+    menuItems,
+    orders,   
+    revenue,
+  })
+}),
+
+app.get('/order-stats',verifyToken,adminVerify, async(req,res)=>{
+  const result=await paymentsCollection.aggregate([
+{
+  $unwind:'$menuItemIds'
+},
+{
+  $lookup:{
+    from:'menu',
+    localField:'menuItemIds',
+    foreignField:'_id',
+    as:'itemsId'
+  }
+},
+{
+  $unwind:'$itemsId'
+},
+{
+  $group:{
+    _id:'$itemsId.category',
+    quantity:{$sum:1},
+    revenue:{$sum:'$itemsId.price'}
+  }
+},
+{
+  $project:{
+    _id:0,
+    category:'$_id',
+    quantity:'$quantity',
+    revenue:'$revenue'
+  }
+}
+  ]).toArray()
+
+  res.send(result)
 })
 
     // Send a ping to confirm a successful connection
